@@ -79,7 +79,7 @@ void Enc(char plain[], int key, int len, int size) {
 			encrypted[i] = plain[size * k + a[i % size]];
 		}
 		else {
-			encrypted[i] = plain[size * k + a[(i % size)]%(len%size)];
+			encrypted[i] = plain[size * k + (i%size)];
 		}
 
 		if (encrypted[i] == '?') {
@@ -136,7 +136,7 @@ void Dec(char plain[], int key, int len, int size) {
 			decrypted[i] = plain[size * k + b[i % size]];
 		}
 		else {
-			decrypted[i] = plain[size * k + b[(i % size)] % (len % size)];
+			decrypted[i] = plain[size * k + (i%size)];
 		}
 
 		if (decrypted[i] == '?') {
