@@ -22,7 +22,7 @@ int main(void) {
 		printf("1. Encrypt\n2. Decrypt\n\nChoose : ");
 		scanf(" %d", &choice);
 
-		printf("Input Text(AtoZ) : \n");
+		printf("Input Text : \n");
 		scanf(" %[^\n]s", userInput);
 
 		len = strlen(userInput);
