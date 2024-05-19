@@ -56,6 +56,7 @@ void Enc(char plain[], int key, int len, int size) {
 	int j = 0;
 	int k = 0;
 	int a[100];
+	int r[100];
 	char encrypted[100];
 
 	srand(key);
@@ -64,6 +65,15 @@ void Enc(char plain[], int key, int len, int size) {
 		a[i] = (rand() % size);
 		for (j = 0; j < i; j++) {
 			if (a[i] == a[j]) {
+				i--;
+			}
+		}
+	}
+
+	for (i = 0; i < len % size; i++) {
+		r[i] = (rand() % (len % size));
+		for (j = 0; j < i; j++) {
+			if (r[i] == r[j]) {
 				i--;
 			}
 		}
@@ -79,7 +89,7 @@ void Enc(char plain[], int key, int len, int size) {
 			encrypted[i] = plain[size * k + a[i % size]];
 		}
 		else {
-			encrypted[i] = plain[size * k + (i%size)];
+			encrypted[i] = plain[size * k + r[i % size]];
 		}
 
 		if (encrypted[i] == '?') {
@@ -100,6 +110,7 @@ void Dec(char plain[], int key, int len, int size) {
 	int min = 0;
 	int a[100];
 	int b[100];
+	int r[100];
 	char decrypted[100];
 
 	b[0] = 0;
@@ -115,6 +126,14 @@ void Dec(char plain[], int key, int len, int size) {
 		}
 	}
 
+	for (i = 0; i < len % size; i++) {
+		r[i] = (rand() % (len % size));
+		for (j = 0; j < i; j++) {
+			if (r[i] == r[j]) {
+				i--;
+			}
+		}
+	}
 
 	for (i = 0; i < size; i++) {
 		for (j = 0; j < size; j++) {
@@ -136,7 +155,7 @@ void Dec(char plain[], int key, int len, int size) {
 			decrypted[i] = plain[size * k + b[i % size]];
 		}
 		else {
-			decrypted[i] = plain[size * k + (i%size)];
+			decrypted[i] = plain[size * k + r[i % size]];
 		}
 
 		if (decrypted[i] == '?') {
