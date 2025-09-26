@@ -44,15 +44,17 @@ private:
     uint64_t permute(uint64_t input, const uint8_t table[N_OUT]) {
         uint64_t output = 0;
         for (size_t i = 0; i < N_OUT; ++i) {
+            // FIPS 테이블은 1-based index를 사용하므로 (N_IN - table[i])로 비트 위치 계산
             uint64_t bit = (input >> (N_IN - table[i])) & 1;
             output |= (bit << (N_OUT - 1 - i));
         }
         return output;
     }
 
-    // 왼쪽 순환 시프트 연산
-    uint32_t left_circular_shift(uint32_t val, int num_shifts) {
-        return (val << num_shifts) | (val >> (28 - num_shifts));
+    // 28비트 값에 대한 왼쪽 순환 시프트 연산
+    uint32_t left_circular_shift_28bit(uint32_t val, int num_shifts) {
+        // 연산이 28비트 공간 내에서만 이루어지도록 보장
+        return ((val << num_shifts) | (val >> (28 - num_shifts))) & 0x0FFFFFFF;
     }
 
     // --- DES 핵심 함수 ---
@@ -72,7 +74,7 @@ private:
             uint8_t row = ((six_bits & 0x20) >> 4) | (six_bits & 0x01);
             uint8_t col = (six_bits & 0x1E) >> 1;
             uint8_t val = S_BOXES[i][row][col];
-            s_box_output |= (val << (28 - i * 4));
+            s_box_output |= (static_cast<uint32_t>(val) << (28 - i * 4));
         }
 
         // 4. 순열 (Permutation)
@@ -90,8 +92,8 @@ private:
         uint32_t D = permuted_key_56 & 0x0FFFFFFF;
 
         for (int i = 0; i < 16; ++i) {
-            C = left_circular_shift(C, SHIFTS[i]);
-            D = left_circular_shift(D, SHIFTS[i]);
+            C = left_circular_shift_28bit(C, SHIFTS[i]);
+            D = left_circular_shift_28bit(D, SHIFTS[i]);
 
             uint64_t combined_key = (static_cast<uint64_t>(C) << 28) | D;
             
@@ -288,3 +290,4 @@ int main() {
 
     return 0;
 }
+
