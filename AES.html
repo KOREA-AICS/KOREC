@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AES C++ 코드 분석 슬라이드 쇼</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Prism.js CSS for Syntax Highlighting (Okaidia Theme) -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-okaidia.min.css" rel="stylesheet" />
+    <style>
+        /* 기본 스타일 및 폰트 설정 */
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* 슬라이드 전환 효과 */
+        .slide {
+            transition: opacity 0.4s ease-in-out, transform 0.4s ease-in-out;
+        }
+
+        .slide.hidden {
+            opacity: 0;
+            transform: scale(0.98);
+            position: absolute; /* 전환 시 레이아웃 깨짐 방지 */
+            width: 100%;
+            pointer-events: none;
+        }
+
+        /* 코드 블록 스타일 커스텀 */
+        pre[class*="language-"] {
+            border-radius: 0.5rem;
+            border: 1px solid #374151; /* gray-700 */
+        }
+        
+        /* 스크롤바 스타일 */
+        .scroll-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .scroll-container::-webkit-scrollbar-track {
+            background: #1f2937; /* gray-800 */
+        }
+        .scroll-container::-webkit-scrollbar-thumb {
+            background-color: #4b5563; /* gray-600 */
+            border-radius: 10px;
+            border: 2px solid #1f2937; /* gray-800 */
+        }
+        
+        .copy-btn {
+            opacity: 0;
+            transition: opacity 0.2s ease-in-out;
+        }
+        .code-container:hover .copy-btn {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200 flex flex-col items-center justify-center min-h-screen p-4 sm:p-6 lg:p-8">
+
+    <div class="w-full max-w-7xl mx-auto">
+        <!-- 헤더 -->
+        <header class="text-center mb-8">
+            <h1 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-cyan-400">AES C++ 코드 완벽 분석</h1>
+            <p class="mt-2 text-lg text-gray-400">T-Table 최적화 기법을 중심으로</p>
+        </header>
+
+        <!-- 슬라이드 뷰어 -->
+        <main id="slide-viewer" class="relative w-full bg-gray-800 rounded-xl shadow-2xl overflow-hidden border border-gray-700" style="min-height: 60vh;">
+            <!-- 슬라이드가 여기에 동적으로 삽입됩니다 -->
+        </main>
+
+        <!-- 네비게이션 컨트롤 -->
+        <nav class="w-full max-w-7xl mx-auto flex items-center justify-between mt-6">
+            <button id="prev-btn" class="px-6 py-2 bg-gray-700 hover:bg-cyan-600 text-white font-semibold rounded-lg shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                이전
+            </button>
+            <div id="slide-counter" class="text-lg font-medium text-gray-300"></div>
+            <button id="next-btn" class="px-6 py-2 bg-gray-700 hover:bg-cyan-600 text-white font-semibold rounded-lg shadow-md transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
+                다음
+            </button>
+        </nav>
+    </div>
+
+    <!-- Prism.js JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 전체 소스 코드
+            const fullSourceCode = `#include <iostream>
+#include <vector>
+#include <cstdint>
+#include <stdexcept>
+#include <cstring>
+#include <array>
+
+/**
+ * @class AES_Optimized
+ * @brief An AES implementation based on the FIPS-197 standard, optimized with T-Tables.
+ *
+ * This class supports AES-128, AES-192, and AES-256. The core encryption and
+ * decryption routines are accelerated using pre-computed lookup tables (T-Tables),
+ * which combine SubBytes, ShiftRows, and MixColumns into a single table lookup
+ * operation per column.
+ */
+class AES_Optimized {
+private:
+    // --- FIPS-197 Standard Constant Tables ---
+    static const uint8_t s_box[256];
+    static const uint8_t inv_s_box[256];
+    static const uint8_t Rcon[11];
+
+    // --- T-Tables for Optimization ---
+    // Encryption and decryption lookup tables merge multiple AES steps.
+    uint32_t Te0[256], Te1[256], Te2[256], Te3[256]; // Encryption T-Tables
+    uint32_t Td0[256], Td1[256], Td2[256], Td3[256]; // Decryption T-Tables
+
+    // Round keys stored as 32-bit words.
+    std::vector<uint32_t> round_keys;
+    // Decryption round keys, pre-computed by applying InvMixColumns.
+    // This is necessary because the T-Table optimization changes the operation order.
+    std::vector<uint32_t> dec_round_keys;
+
+    uint8_t gmul(uint8_t a, uint8_t b) {
+        uint8_t p = 0;
+        for (int i = 0; i < 8; i++) {
+            if (b & 1) { p ^= a; }
+            bool hi_bit_set = (a & 0x80);
+            a <<= 1;
+            if (hi_bit_set) { a ^= 0x1B; }
+            b >>= 1;
+        }
+        return p;
+    }
+
+    void build_tables() {
+        for (int i = 0; i < 256; i++) {
+            uint8_t s = s_box[i];
+            uint8_t s2 = gmul(s, 2);
+            uint8_t s3 = gmul(s, 3);
+            uint32_t te_val = (static_cast<uint32_t>(s2) << 24) | (static_cast<uint32_t>(s) << 16) | (static_cast<uint32_t>(s) << 8) | static_cast<uint32_t>(s3);
+            Te0[i] = te_val;
+            Te1[i] = (te_val >> 8) | (te_val << 24);
+            Te2[i] = (te_val >> 16) | (te_val << 16);
+            Te3[i] = (te_val >> 24) | (te_val << 8);
+            uint8_t is = inv_s_box[i];
+            uint8_t is9 = gmul(is, 9), isB = gmul(is, 0xB), isD = gmul(is, 0xD), isE = gmul(is, 0xE);
+            uint32_t td_val = (static_cast<uint32_t>(isE) << 24) | (static_cast<uint32_t>(is9) << 16) | (static_cast<uint32_t>(isD) << 8) | static_cast<uint32_t>(isB);
+            Td0[i] = td_val;
+            Td1[i] = (td_val >> 8) | (td_val << 24);
+            Td2[i] = (td_val >> 16) | (td_val << 16);
+            Td3[i] = (td_val >> 24) | (td_val << 8);
+        }
+    }
+
+    uint32_t bytes_to_uint32(const uint8_t* bytes) {
+        return (static_cast<uint32_t>(bytes[0]) << 24) | (static_cast<uint32_t>(bytes[1]) << 16) | (static_cast<uint32_t>(bytes[2]) << 8) | static_cast<uint32_t>(bytes[3]);
+    }
+
+    void uint32_to_bytes(uint32_t word, uint8_t* bytes) {
+        bytes[0] = (word >> 24) & 0xFF;
+        bytes[1] = (word >> 16) & 0xFF;
+        bytes[2] = (word >> 8) & 0xFF;
+        bytes[3] = word & 0xFF;
+    }
+
+    void key_expansion(const uint8_t* key, int Nk, int Nr) {
+        round_keys.resize(4 * (Nr + 1));
+        for (int i = 0; i < Nk; ++i) { round_keys[i] = bytes_to_uint32(key + i * 4); }
+        for (int i = Nk; i < 4 * (Nr + 1); ++i) {
+            uint32_t temp = round_keys[i - 1];
+            if (i % Nk == 0) {
+                temp = (s_box[(temp >> 16) & 0xFF] << 24) | (s_box[(temp >> 8) & 0xFF] << 16) | (s_box[temp & 0xFF] << 8) | (s_box[temp >> 24]);
+                temp ^= (static_cast<uint32_t>(Rcon[i / Nk]) << 24);
+            } else if (Nk > 6 && i % Nk == 4) {
+                temp = (s_box[(temp >> 24) & 0xFF] << 24) | (s_box[(temp >> 16) & 0xFF] << 16) | (s_box[(temp >> 8) & 0xFF] << 8) | (s_box[temp & 0xFF]);
+            }
+            round_keys[i] = round_keys[i - Nk] ^ temp;
+        }
+    }
+
+    uint32_t inv_mix_columns_word(uint32_t w) {
+        uint8_t b[4]; uint32_to_bytes(w, b);
+        uint8_t res[4];
+        res[0] = gmul(0x0e, b[0]) ^ gmul(0x0b, b[1]) ^ gmul(0x0d, b[2]) ^ gmul(0x09, b[3]);
+        res[1] = gmul(0x09, b[0]) ^ gmul(0x0e, b[1]) ^ gmul(0x0b, b[2]) ^ gmul(0x0d, b[3]);
+        res[2] = gmul(0x0d, b[0]) ^ gmul(0x09, b[1]) ^ gmul(0x0e, b[2]) ^ gmul(0x0b, b[3]);
+        res[3] = gmul(0x0b, b[0]) ^ gmul(0x0d, b[1]) ^ gmul(0x09, b[2]) ^ gmul(0x0e, b[3]);
+        return bytes_to_uint32(res);
+    }
+public:
+    AES_Optimized(const uint8_t* key, int key_bits) {
+        build_tables();
+        int Nk = key_bits / 32, Nr;
+        switch(key_bits) {
+            case 128: Nr = 10; break;
+            case 192: Nr = 12; break;
+            case 256: Nr = 14; break;
+            default: throw std::invalid_argument("Invalid key size.");
+        }
+        key_expansion(key, Nk, Nr);
+        dec_round_keys = round_keys;
+        for (int round = 1; round < Nr; ++round) {
+            for (int i = 0; i < 4; ++i) {
+                dec_round_keys[round*4+i] = inv_mix_columns_word(round_keys[round*4+i]);
+            }
+        }
+    }
+    void encrypt_block(const uint8_t* plaintext, uint8_t* ciphertext) {
+        uint32_t s0 = bytes_to_uint32(plaintext) ^ round_keys[0], s1 = bytes_to_uint32(plaintext+4) ^ round_keys[1], s2 = bytes_to_uint32(plaintext+8) ^ round_keys[2], s3 = bytes_to_uint32(plaintext+12) ^ round_keys[3];
+        int Nr = round_keys.size()/4-1;
+        for (int round=1; round<Nr; ++round) {
+            uint32_t t0 = Te0[(s0>>24)&0xFF] ^ Te1[(s1>>16)&0xFF] ^ Te2[(s2>>8)&0xFF] ^ Te3[s3&0xFF] ^ round_keys[round*4];
+            uint32_t t1 = Te0[(s1>>24)&0xFF] ^ Te1[(s2>>16)&0xFF] ^ Te2[(s3>>8)&0xFF] ^ Te3[s0&0xFF] ^ round_keys[round*4+1];
+            uint32_t t2 = Te0[(s2>>24)&0xFF] ^ Te1[(s3>>16)&0xFF] ^ Te2[(s0>>8)&0xFF] ^ Te3[s1&0xFF] ^ round_keys[round*4+2];
+            uint32_t t3 = Te0[(s3>>24)&0xFF] ^ Te1[(s0>>16)&0xFF] ^ Te2[(s1>>8)&0xFF] ^ Te3[s2&0xFF] ^ round_keys[round*4+3];
+            s0=t0; s1=t1; s2=t2; s3=t3;
+        }
+        uint32_t t0 = (static_cast<uint32_t>(s_box[(s0>>24)&0xFF])<<24)|(static_cast<uint32_t>(s_box[(s1>>16)&0xFF])<<16)|(static_cast<uint32_t>(s_box[(s2>>8)&0xFF])<<8)|static_cast<uint32_t>(s_box[s3&0xFF]);
+        uint32_t t1 = (static_cast<uint32_t>(s_box[(s1>>24)&0xFF])<<24)|(static_cast<uint32_t>(s_box[(s2>>16)&0xFF])<<16)|(static_cast<uint32_t>(s_box[(s3>>8)&0xFF])<<8)|static_cast<uint32_t>(s_box[s0&0xFF]);
+        uint32_t t2 = (static_cast<uint32_t>(s_box[(s2>>24)&0xFF])<<24)|(static_cast<uint32_t>(s_box[(s3>>16)&0xFF])<<16)|(static_cast<uint32_t>(s_box[(s0>>8)&0xFF])<<8)|static_cast<uint32_t>(s_box[s1&0xFF]);
+        uint32_t t3 = (static_cast<uint32_t>(s_box[(s3>>24)&0xFF])<<24)|(static_cast<uint32_t>(s_box[(s0>>16)&0xFF])<<16)|(static_cast<uint32_t>(s_box[(s1>>8)&0xFF])<<8)|static_cast<uint32_t>(s_box[s2&0xFF]);
+        uint32_to_bytes(t0^round_keys[Nr*4], ciphertext); uint32_to_bytes(t1^round_keys[Nr*4+1], ciphertext+4); uint32_to_bytes(t2^round_keys[Nr*4+2], ciphertext+8); uint32_to_bytes(t3^round_keys[Nr*4+3], ciphertext+12);
+    }
+    void decrypt_block(const uint8_t* ciphertext, uint8_t* plaintext) {
+        int Nr = round_keys.size()/4-1;
+        uint32_t s0 = bytes_to_uint32(ciphertext) ^ round_keys[Nr*4], s1 = bytes_to_uint32(ciphertext+4) ^ round_keys[Nr*4+1], s2 = bytes_to_uint32(ciphertext+8) ^ round_keys[Nr*4+2], s3 = bytes_to_uint32(ciphertext+12) ^ round_keys[Nr*4+3];
+        for (int round=Nr-1; round>=1; --round) {
+            uint32_t t0 = Td0[(s0>>24)&0xFF] ^ Td1[(s3>>16)&0xFF] ^ Td2[(s2>>8)&0xFF] ^ Td3[s1&0xFF] ^ dec_round_keys[round*4];
+            uint32_t t1 = Td0[(s1>>24)&0xFF] ^ Td1[(s0>>16)&0xFF] ^ Td2[(s3>>8)&0xFF] ^ Td3[s2&0xFF] ^ dec_round_keys[round*4+1];
+            uint32_t t2 = Td0[(s2>>24)&0xFF] ^ Td1[(s1>>16)&0xFF] ^ Td2[(s0>>8)&0xFF] ^ Td3[s3&0xFF] ^ dec_round_keys[round*4+2];
+            uint32_t t3 = Td0[(s3>>24)&0xFF] ^ Td1[(s2>>16)&0xFF] ^ Td2[(s1>>8)&0xFF] ^ Td3[s0&0xFF] ^ dec_round_keys[round*4+3];
+            s0=t0; s1=t1; s2=t2; s3=t3;
+        }
+        uint32_t t0 = (static_cast<uint32_t>(inv_s_box[(s0>>24)&0xFF])<<24)|(static_cast<uint32_t>(inv_s_box[(s3>>16)&0xFF])<<16)|(static_cast<uint32_t>(inv_s_box[(s2>>8)&0xFF])<<8)|static_cast<uint32_t>(inv_s_box[s1&0xFF]);
+        uint32_t t1 = (static_cast<uint32_t>(inv_s_box[(s1>>24)&0xFF])<<24)|(static_cast<uint32_t>(inv_s_box[(s0>>16)&0xFF])<<16)|(static_cast<uint32_t>(inv_s_box[(s3>>8)&0xFF])<<8)|static_cast<uint32_t>(inv_s_box[s2&0xFF]);
+        uint32_t t2 = (static_cast<uint32_t>(inv_s_box[(s2>>24)&0xFF])<<24)|(static_cast<uint32_t>(inv_s_box[(s1>>16)&0xFF])<<16)|(static_cast<uint32_t>(inv_s_box[(s0>>8)&0xFF])<<8)|static_cast<uint32_t>(inv_s_box[s3&0xFF]);
+        uint32_t t3 = (static_cast<uint32_t>(inv_s_box[(s3>>24)&0xFF])<<24)|(static_cast<uint32_t>(inv_s_box[(s2>>16)&0xFF])<<16)|(static_cast<uint32_t>(inv_s_box[(s1>>8)&0xFF])<<8)|static_cast<uint32_t>(inv_s_box[s0&0xFF]);
+        uint32_to_bytes(t0^round_keys[0], plaintext); uint32_to_bytes(t1^round_keys[1], plaintext+4); uint32_to_bytes(t2^round_keys[2], plaintext+8); uint32_to_bytes(t3^round_keys[3], plaintext+12);
+    }
+};
+
+const uint8_t AES_Optimized::s_box[256] = {
+    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
+    0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0, 0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0,
+    0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc, 0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15,
+    0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a, 0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75,
+    0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0, 0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84,
+    0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b, 0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf,
+    0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85, 0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8,
+    0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5, 0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2,
+    0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17, 0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73,
+    0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88, 0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb,
+    0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c, 0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79,
+    0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9, 0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08,
+    0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
+    0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
+    0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
+    0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
+};
+const uint8_t AES_Optimized::inv_s_box[256] = {
+    0x52, 0x09, 0x6a, 0d5, 0x30, 0x36, 0xa5, 0x38, 0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb,
+    0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87, 0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb,
+    0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d, 0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e,
+    0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2, 0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25,
+    0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16, 0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92,
+    0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda, 0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84,
+    0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a, 0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06,
+    0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02, 0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b,
+    0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea, 0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73,
+    0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85, 0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e,
+    0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89, 0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b,
+    0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20, 0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4,
+    0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31, 0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f,
+    0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d, 0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef,
+    0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61,
+    0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
+};
+const uint8_t AES_Optimized::Rcon[11] = {
+    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36
+};
+
+void print_hex_array(const std::string& label, const uint8_t* data, size_t len) {
+    std::cout << label;
+    std::cout << std::hex;
+    for (size_t i = 0; i < len; ++i) {
+        if (data[i] < 16) std::cout << " 0"; else std::cout << " ";
+        std::cout << static_cast<int>(data[i]);
+    }
+    std::cout << std::dec << std::endl;
+}
+
+// NIST FIPS-197 Appendix B - AES-128 Test Vector
+int main() {
+    uint8_t key[16] = { 0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c };
+    uint8_t plaintext[16] = { 0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34 };
+    uint8_t expected_ciphertext[16] = { 0x39, 0x25, 0x84, 0x1d, 0x02, 0xdc, 0x09, 0xfb, 0xdc, 0x11, 0x85, 0x97, 0x19, 0x6a, 0x0b, 0x32 };
+    uint8_t ciphertext[16];
+    uint8_t decrypted_plaintext[16];
+    try {
+        AES_Optimized aes(key, 128);
+        print_hex_array("Plaintext:           ", plaintext, 16);
+        print_hex_array("Key:                 ", key, 16);
+        std::cout << "---------------------------------------------------------" << std::endl;
+        aes.encrypt_block(plaintext, ciphertext);
+        print_hex_array("Encrypted Ciphertext:", ciphertext, 16);
+        print_hex_array("Expected Ciphertext: ", expected_ciphertext, 16);
+        std::cout << "---------------------------------------------------------" << std::endl;
+        aes.decrypt_block(ciphertext, decrypted_plaintext);
+        print_hex_array("Decrypted Plaintext: ", decrypted_plaintext, 16);
+        print_hex_array("Original Plaintext:  ", plaintext, 16);
+        bool ciphertext_match = (memcmp(ciphertext, expected_ciphertext, 16) == 0);
+        bool plaintext_match = (memcmp(plaintext, decrypted_plaintext, 16) == 0);
+        if (ciphertext_match && plaintext_match) {
+            std::cout << "\\nSuccess: NIST FIPS-197 test vector passed." << std::endl;
+        } else {
+            std::cout << "\\nError: NIST FIPS-197 test vector failed." << std::endl;
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "An error occurred: " << e.what() << std::endl;
+        return 1;
+    }
+    return 0;
+}`;
+
+            const slideData = [
+                {
+                    title: '슬라이드 0: 전체 소스 코드',
+                    code: fullSourceCode,
+                    explanation: `
+                        <div class="flex flex-col items-center justify-center h-full text-center">
+                            <h3 class="text-xl font-semibold text-gray-100 mb-3">전체 C++ 소스 코드</h3>
+                            <p class="text-gray-300 leading-relaxed">
+                                아래 코드는 이 프레젠테이션에서 분석할 전체 C++ 코드입니다.
+                                <br/>
+                                코드 블록 우측 상단의 '복사' 버튼을 눌러 전체 코드를 클립보드에 복사할 수 있습니다.
+                            </p>
+                        </div>
+                    `
+                },
+                {
+                    title: '슬라이드 1: 개요 및 헤더 파일',
+                    code: `#include <iostream>
+#include <vector>
+#include <cstdint>
+#include <stdexcept>
+#include <cstring>
+#include <array>
+
+/**
+ * @class AES_Optimized
+ * @brief T-Table을 사용하여 최적화된 FIPS-197 표준 기반 AES 구현.
+  * ...
+ */`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">iostream:</strong> 콘솔 입출력을 위한 <code>std::cout</code> 같은 함수를 사용하기 위해 포함함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">vector:</strong> 크기가 동적으로 변하는 배열인 <code>std::vector</code>를 사용하여 라운드 키를 저장하기 위함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">cstdint:</strong> <code>uint8_t</code>(1바이트), <code>uint32_t</code>(4바이트)와 같이 고정된 크기의 정수 타입을 사용하기 위해 포함함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">stdexcept:</strong> 잘못된 키 길이를 전달했을 때 <code>std::invalid_argument</code> 예외를 발생시키기 위함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">cstring:</strong> <code>memcmp</code> 함수를 사용해 암/복호화 결과가 올바른지 바이트 단위로 비교하기 위함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">array:</strong> <code>std::array</code>를 사용하기 위한 헤더임. (이 코드에서는 직접 사용되지 않음)</li>
+                            <li class="mb-2"><strong class="text-cyan-400">@class AES_Optimized:</strong> FIPS-197 표준 AES 알고리즘을 구현하며, T-Table 최적화를 통해 성능을 향상시킨 버전임.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 2: AES_Optimized 클래스 멤버 변수',
+                    code: `class AES_Optimized {
+private:
+    // --- FIPS-197 표준 상수 테이블 ---
+    static const uint8_t s_box[256];
+    static const uint8_t inv_s_box[256];
+    static const uint8_t Rcon[11];
+
+    // --- 최적화를 위한 T-Table ---
+    uint32_t Te0[256], Te1[256], Te2[256], Te3[256]; // 암호화 T-Table
+    uint32_t Td0[256], Td1[256], Td2[256], Td3[256]; // 복호화 T-Table
+
+    // 라운드 키
+    std::vector<uint32_t> round_keys;
+    // 복호화 라운드 키
+    std::vector<uint32_t> dec_round_keys;`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">private:</strong> 클래스 내부에서만 접근 가능한 멤버들을 선언함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">s_box, inv_s_box, Rcon:</strong> AES 표준에 명시된 상수 테이블들임. <code>s_box</code>는 SubBytes, <code>inv_s_box</code>는 InvSubBytes, <code>Rcon</code>은 키 확장 단계에서 사용됨.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">Te0 ~ Te3, Td0 ~ Td3:</strong> 성능 최적화를 위한 T-Table(룩업 테이블)임. <code>Te</code>는 암호화, <code>Td</code>는 복호화용이며, 여러 AES 단계를 하나의 테이블 조회로 합쳐줌.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">round_keys:</strong> 키 확장 루틴을 통해 생성된 암호화 라운드 키들을 32비트 워드 단위로 저장하는 벡터임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">dec_round_keys:</strong> T-Table 기반 복호화를 위해 특별히 사전 계산된 복호화 라운드 키를 저장하는 벡터임.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 3: 갈루아 필드 곱셈 (gmul)',
+                    code: `uint8_t gmul(uint8_t a, uint8_t b) {
+    uint8_t p = 0;
+    for (int i = 0; i < 8; i++) {
+        if (b & 1) {
+            p ^= a;
+        }
+        bool hi_bit_set = (a & 0x80);
+        a <<= 1;
+        if (hi_bit_set) {
+            a ^= 0x1B; // AES 기약 다항식
+        }
+        b >>= 1;
+    }
+    return p;
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">gmul:</strong> 갈루아 필드 GF(2^8) 상에서 두 바이트의 곱셈을 수행함. AES의 <code>MixColumns</code> 연산에 필수적임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">for loop (8번 반복):</strong> 8비트 연산이므로 8번 반복함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">if (b & 1):</strong> <code>b</code>의 최하위 비트가 1이면, 결과 <code>p</code>에 <code>a</code>를 XOR함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">a <<= 1:</strong> <code>a</code>를 왼쪽으로 1비트 시프트하여 x를 곱하는 효과를 냄.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">if (hi_bit_set):</strong> 시프트 전 <code>a</code>의 최상위 비트가 1이었다면 오버플로우가 발생한 것이므로, AES 기약 다항식(<code>0x1B</code>)을 XOR하여 결과를 필드 내로 되돌림.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">b >>= 1:</strong> <code>b</code>를 오른쪽으로 시프트하여 다음 비트를 검사할 준비를 함.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 4: T-Table 생성 (암호화)',
+                    code: `void build_tables() {
+    for (int i = 0; i < 256; i++) {
+        uint8_t s = s_box[i];
+        uint8_t s2 = gmul(s, 2);
+        uint8_t s3 = gmul(s, 3);
+
+        uint32_t te_val = (static_cast<uint32_t>(s2) << 24) |
+                          (static_cast<uint32_t>(s)  << 16) |
+                          (static_cast<uint32_t>(s)  << 8)  |
+                           static_cast<uint32_t>(s3);
+
+        Te0[i] = te_val;
+        Te1[i] = (te_val >> 8)  | (te_val << 24);
+        Te2[i] = (te_val >> 16) | (te_val << 16);
+        Te3[i] = (te_val >> 24) | (te_val << 8);
+        // ...
+    }
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">build_tables():</strong> 생성자에서 호출되어 암호화/복호화에 필요한 T-Table을 미리 계산함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">s = s_box[i]:</strong> <code>SubBytes</code> 변환을 미리 수행함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">gmul(s, 2), gmul(s, 3):</strong> <code>MixColumns</code> 행렬 곱셈에 필요한 값(2, 1, 1, 3)을 미리 계산함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">te_val:</strong> <code>SubBytes</code>와 <code>MixColumns</code>의 결과를 하나의 32비트 워드로 조합함. <code>[s*2, s, s, s*3]</code> 형태임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">Te0 ~ Te3:</strong> <code>ShiftRows</code> 효과를 시뮬레이션하기 위해 <code>te_val</code>을 바이트 단위로 회전(circular shift)시켜 4개의 암호화 테이블을 생성함.</li>
+                        </ul>
+                    `
+                },
+                 {
+                    title: '슬라이드 5: T-Table 생성 (복호화)',
+                    code: `// (build_tables 함수 내부)
+        uint8_t is = inv_s_box[i];
+        uint8_t is9 = gmul(is, 9);
+        uint8_t isB = gmul(is, 0xB);
+        uint8_t isD = gmul(is, 0xD);
+        uint8_t isE = gmul(is, 0xE);
+
+        uint32_t td_val = (static_cast<uint32_t>(isE) << 24) |
+                          (static_cast<uint32_t>(is9) << 16) |
+                          (static_cast<uint32_t>(isD) << 8)  |
+                           static_cast<uint32_t>(isB);
+
+        Td0[i] = td_val;
+        Td1[i] = (td_val >> 8)  | (td_val << 24);
+        Td2[i] = (td_val >> 16) | (td_val << 16);
+        Td3[i] = (td_val >> 24) | (td_val << 8);
+    }
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2">이 부분은 <code>build_tables</code> 함수 내에서 복호화 T-Table을 생성하는 로직임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">is = inv_s_box[i]:</strong> <code>InvSubBytes</code> 변환을 미리 수행함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">is9, isB, isD, isE:</strong> <code>InvMixColumns</code> 행렬 곱셈에 필요한 상수(0x0E, 0x09, 0x0D, 0x0B)와의 곱셈을 미리 계산함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">td_val:</strong> <code>InvSubBytes</code>와 <code>InvMixColumns</code> 결과를 32비트 워드로 조합함. <code>[is*14, is*9, is*13, is*11]</code> 형태임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">Td0 ~ Td3:</strong> <code>InvShiftRows</code> 효과를 시뮬레이션하기 위해 <code>td_val</code>을 바이트 단위로 회전시켜 4개의 복호화 테이블을 생성함.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 6: 유틸리티 함수 및 키 확장 (시작)',
+                    code: `uint32_t bytes_to_uint32(const uint8_t* bytes) { /* ... */ }
+void uint32_to_bytes(uint32_t word, uint8_t* bytes) { /* ... */ }
+
+void key_expansion(const uint8_t* key, int Nk, int Nr) {
+    round_keys.resize(4 * (Nr + 1));
+    for (int i = 0; i < Nk; ++i) {
+        round_keys[i] = bytes_to_uint32(key + i * 4);
+    }
+    // ...
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">bytes_to_uint32/uint32_to_bytes:</strong> 4바이트 배열과 32비트 워드 간 변환을 수행하는 헬퍼 함수임. 빅 엔디안 방식을 사용함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">key_expansion:</strong> 초기 비밀 키로부터 모든 라운드 키를 생성하는 핵심 함수임.
+                                <ul class="list-disc pl-6 mt-1">
+                                    <li><code>Nk</code>: 키의 워드 수 (128bit=4, 192bit=6, 256bit=8)</li>
+                                    <li><code>Nr</code>: 총 라운드 수 (128bit=10, 192bit=12, 256bit=14)</li>
+                                </ul>
+                            </li>
+                            <li class="mb-2"><strong class="text-cyan-400">round_keys.resize(...):</strong> 필요한 총 라운드 키 수만큼 벡터 크기를 할당함. (총 라운드 수 + 1) * 4워드.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">for loop:</strong> 초기 비밀 키를 4바이트씩 끊어 32비트 워드로 변환하고, <code>round_keys</code> 벡터의 앞부분에 저장함.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 7: 키 확장 (핵심 로직)',
+                    code: `// (key_expansion 함수 내부)
+for (int i = Nk; i < 4 * (Nr + 1); ++i) {
+    uint32_t temp = round_keys[i - 1];
+    if (i % Nk == 0) {
+        // RotWord, SubWord, Rcon XOR 적용
+        temp = (s_box[(temp >> 16) & 0xFF] << 24) |
+               (s_box[(temp >> 8)  & 0xFF] << 16) |
+               (s_box[ temp       & 0xFF] << 8)  |
+               (s_box[ temp >> 24]);
+        temp ^= (static_cast<uint32_t>(Rcon[i / Nk]) << 24);
+    } else if (Nk > 6 && i % Nk == 4) { // AES-256
+        // 추가 SubWord 적용
+        temp = (s_box[(temp >> 24) & 0xFF] << 24) |
+               (s_box[(temp >> 16) & 0xFF] << 16) |
+               (s_box[(temp >> 8)  & 0xFF] << 8)  |
+               (s_box[ temp       & 0xFF]);
+    }
+    round_keys[i] = round_keys[i - Nk] ^ temp;
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">for loop:</strong> 초기 키 이후의 나머지 라운드 키를 생성하는 루프임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">if (i % Nk == 0):</strong> 각 라운드의 첫 번째 워드를 생성하는 규칙임.
+                                <ul class="list-disc pl-6 mt-1">
+                                    <li>이전 워드에 <code>RotWord</code>(바이트 회전)와 <code>SubWord</code>(S-Box 치환)를 적용.</li>
+                                    <li>그 결과에 라운드 상수(<code>Rcon</code>)를 XOR함.</li>
+                                </ul>
+                            </li>
+                            <li class="mb-2"><strong class="text-cyan-400">else if (Nk > 6 ...):</strong> AES-256의 경우에만 적용되는 추가 규칙임. 라운드의 5번째 워드를 생성할 때 <code>SubWord</code> 연산을 추가로 수행함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">round_keys[i] = ...:</strong> 최종 계산된 <code>temp</code> 값과 <code>Nk</code>번째 이전 워드를 XOR하여 현재 라운드 키를 생성함.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 8: 역 혼합 및 생성자',
+                    code: `uint32_t inv_mix_columns_word(uint32_t w) {
+    // ... 32비트 워드에 InvMixColumns 변환 수행 ...
+    return bytes_to_uint32(res);
+}
+public:
+    AES_Optimized(const uint8_t* key, int key_bits) {
+        build_tables();
+        int Nk = key_bits / 32;
+        int Nr;
+        switch(key_bits) {
+            case 128: Nr = 10; break;
+            case 192: Nr = 12; break;
+            case 256: Nr = 14; break;
+            default: throw std::invalid_argument(...);
+        }
+        key_expansion(key, Nk, Nr);
+        // ...
+    }`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">inv_mix_columns_word:</strong> 복호화 라운드 키를 사전 계산하기 위해, 32비트 워드 하나에 대해 <code>InvMixColumns</code> 변환을 수행하는 헬퍼 함수임.</li>
+                             <li class="mb-2"><strong class="text-cyan-400">public:</strong> 클래스 외부에서 호출할 수 있는 멤버들을 선언함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">AES_Optimized(...):</strong> 클래스 생성자임. 객체가 생성될 때 호출됨.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">build_tables():</strong> 암호화/복호화에 필요한 T-Table을 미리 생성함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">switch(key_bits):</strong> 키 길이에 따라 라운드 수(<code>Nr</code>)와 워드 수(<code>Nk</code>)를 결정함. 유효하지 않은 키 길이면 예외를 던짐.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">key_expansion(...):</strong> 결정된 값으로 모든 암호화 라운드 키를 생성함.</li>
+                        </ul>
+                    `
+                },
+                 {
+                    title: '슬라이드 9: 생성자 - 복호화 키 사전 계산',
+                    code: `// (생성자 내부)
+    dec_round_keys = round_keys;
+    for (int round = 1; round < Nr; ++round) {
+        for (int i = 0; i < 4; ++i) {
+            dec_round_keys[round * 4 + i] = 
+                inv_mix_columns_word(round_keys[round * 4 + i]);
+        }
+    }
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2">이 코드는 생성자의 마지막 부분으로, T-Table 기반 복호화에 필요한 특별한 라운드 키를 미리 계산함.</li>
+                            <li class="mb-2">T-Table 복호화는 연산 순서가 표준과 약간 다르기 때문에, 중간 라운드 키들에 <code>InvMixColumns</code> 변환을 미리 적용해야 함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">dec_round_keys = round_keys:</strong> 먼저 암호화 라운드 키를 그대로 복사함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">for (round = 1 to Nr-1):</strong> 첫 라운드와 마지막 라운드를 제외한 모든 중간 라운드에 대해 반복함. (이 두 라운드는 <code>MixColumns</code> 계열 연산이 없음)</li>
+                            <li class="mb-2"><strong class="text-cyan-400">dec_round_keys[...] = ...:</strong> 각 중간 라운드 워드에 <code>inv_mix_columns_word</code> 함수를 적용하여 변환된 키를 <code>dec_round_keys</code>에 덮어씀.</li>
+                        </ul>
+                    `
+                },
+                 {
+                    title: '슬라이드 10: 블록 암호화 (초기 및 메인 라운드)',
+                    code: `void encrypt_block(const uint8_t* plaintext, uint8_t* ciphertext) {
+    // 초기 라운드: AddRoundKey
+    uint32_t s0 = bytes_to_uint32(plaintext)      ^ round_keys[0];
+    uint32_t s1 = bytes_to_uint32(plaintext + 4)  ^ round_keys[1];
+    uint32_t s2 = bytes_to_uint32(plaintext + 8)  ^ round_keys[2];
+    uint32_t s3 = bytes_to_uint32(plaintext + 12) ^ round_keys[3];
+
+    int Nr = round_keys.size() / 4 - 1;
+
+    // 메인 라운드: T-Table 사용
+    for (int round = 1; round < Nr; ++round) {
+        uint32_t t0 = Te0[(s0 >> 24) & 0xFF] ^ Te1[(s1 >> 16) & 0xFF] ^ 
+                      Te2[(s2 >> 8)  & 0xFF] ^ Te3[ s3        & 0xFF] ^ round_keys[round*4];
+        // ... t1, t2, t3 계산 ...
+        s0 = t0; s1 = t1; s2 = t2; s3 = t3;
+    }
+    // ...
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">encrypt_block:</strong> 16바이트 평문 블록 하나를 암호화하는 함수임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">초기 라운드:</strong> 평문을 32비트 워드 4개(<code>s0</code>-<code>s3</code>)로 변환하고 첫 번째 라운드 키와 XOR함 (<code>AddRoundKey</code>).</li>
+                            <li class="mb-2"><strong class="text-cyan-400">메인 라운드 (for loop):</strong> 마지막 라운드를 제외하고 반복함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">t0 = ...:</strong> T-Table을 사용하여 다음 상태의 첫 번째 열(<code>t0</code>)을 계산함.
+                                <ul class="list-disc pl-6 mt-1">
+                                    <li>현재 상태(<code>s0</code>-<code>s3</code>)의 각 바이트를 인덱스로 T-Table(<code>Te0</code>-<code>Te3</code>) 값을 조회함. 이 과정이 <code>SubBytes</code>, <code>ShiftRows</code>, <code>MixColumns</code>를 한 번에 처리함.</li>
+                                    <li>조회된 값들을 모두 XOR하고, 현재 라운드 키를 XOR하여 다음 상태를 계산함.</li>
+                                </ul>
+                            </li>
+                            <li class="mb-2"><strong class="text-cyan-400">s0 = t0; ...:</strong> 계산된 결과를 다음 라운드를 위해 상태 변수에 업데이트함.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 11: 블록 암호화 (마지막 라운드)',
+                    code: `// (encrypt_block 함수 내부)
+    // 마지막 라운드: SubBytes, ShiftRows, AddRoundKey
+    uint32_t t0 = (static_cast<uint32_t>(s_box[(s0 >> 24) & 0xFF]) << 24) |
+                  (static_cast<uint32_t>(s_box[(s1 >> 16) & 0xFF]) << 16) |
+                  (static_cast<uint32_t>(s_box[(s2 >> 8)  & 0xFF]) << 8)  |
+                   static_cast<uint32_t>(s_box[ s3        & 0xFF]);
+    // ... t1, t2, t3 계산 ...
+
+    uint32_to_bytes(t0 ^ round_keys[Nr*4],   ciphertext);
+    uint32_to_bytes(t1 ^ round_keys[Nr*4+1], ciphertext + 4);
+    uint32_to_bytes(t2 ^ round_keys[Nr*4+2], ciphertext + 8);
+    uint32_to_bytes(t3 ^ round_keys[Nr*4+3], ciphertext + 12);
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2">이 코드는 <code>encrypt_block</code> 함수의 마지막 부분으로, **마지막 라운드**를 처리함.</li>
+                            <li class="mb-2">AES 표준에 따라 마지막 라운드에서는 <code>MixColumns</code>를 수행하지 않으므로, T-Table을 사용하지 않음.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">t0 = ...:</strong> 다음 상태의 첫 번째 열(<code>t0</code>)을 계산함.
+                                <ul class="list-disc pl-6 mt-1">
+                                    <li><code>s_box[...]</code>: <code>SubBytes</code> 단계를 수행함.</li>
+                                    <li>바이트를 가져오는 위치와 조합하는 방식이 <code>ShiftRows</code> 단계를 동시에 수행함.</li>
+                                </ul>
+                            </li>
+                            <li class="mb-2"><strong class="text-cyan-400">uint32_to_bytes(...):</strong> <code>SubBytes</code>/<code>ShiftRows</code> 결과에 마지막 라운드 키를 XOR하고(<code>AddRoundKey</code>), 최종 결과를 바이트로 변환하여 <code>ciphertext</code> 배열에 저장함.</li>
+                        </ul>
+                    `
+                },
+                 {
+                    title: '슬라이드 12: 블록 복호화 (초기 및 메인 라운드)',
+                    code: `void decrypt_block(const uint8_t* ciphertext, uint8_t* plaintext) {
+    int Nr = round_keys.size() / 4 - 1;
+
+    // 초기 라운드: AddRoundKey
+    uint32_t s0 = bytes_to_uint32(ciphertext) ^ round_keys[Nr * 4];
+    // ... s1, s2, s3 계산 ...
+
+    // 메인 라운드: T-Table 사용
+    for (int round = Nr - 1; round >= 1; --round) {
+        uint32_t t0 = Td0[(s0 >> 24) & 0xFF] ^ Td1[(s3 >> 16) & 0xFF] ^ 
+                      Td2[(s2 >> 8)  & 0xFF] ^ Td3[ s1        & 0xFF] ^ dec_round_keys[round*4];
+        // ... t1, t2, t3 계산 ...
+        s0 = t0; s1 = t1; s2 = t2; s3 = t3;
+    }
+    // ...
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">decrypt_block:</strong> 16바이트 암호문 블록을 복호화하는 함수임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">초기 라운드:</strong> 암호문을 워드로 변환하고, 암호화의 *마지막* 라운드 키와 XOR하여 <code>AddRoundKey</code>를 수행함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">메인 라운드 (for loop):</strong> 역순으로 반복함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">t0 = ...:</strong> 복호화 T-Table(<code>Td</code>)을 사용하여 이전 상태의 첫 번째 열을 계산함.
+                                <ul class="list-disc pl-6 mt-1">
+                                    <li>이 과정이 <code>InvSubBytes</code>, <code>InvShiftRows</code>, <code>InvMixColumns</code>를 한 번에 처리함.</li>
+                                    <li>결과에 사전 계산된 복호화 라운드 키(<code>dec_round_keys</code>)를 XOR하여 <code>AddRoundKey</code>를 수행함.</li>
+                                </ul>
+                            </li>
+                             <li class="mb-2"><strong class="text-cyan-400">s0 = t0; ...:</strong> 계산된 결과를 다음 라운드를 위해 상태 변수에 업데이트함.</li>
+                        </ul>
+                    `
+                },
+                 {
+                    title: '슬라이드 13: 블록 복호화 (마지막 라운드)',
+                    code: `// (decrypt_block 함수 내부)
+    // 마지막 라운드: InvSubBytes, InvShiftRows, AddRoundKey
+    uint32_t t0 = (static_cast<uint32_t>(inv_s_box[(s0 >> 24) & 0xFF]) << 24) |
+                  (static_cast<uint32_t>(inv_s_box[(s3 >> 16) & 0xFF]) << 16) |
+                  (static_cast<uint32_t>(inv_s_box[(s2 >> 8)  & 0xFF]) << 8)  |
+                   static_cast<uint32_t>(inv_s_box[ s1        & 0xFF]);
+    // ... t1, t2, t3 계산 ...
+
+    uint32_to_bytes(t0 ^ round_keys[0], plaintext);
+    uint32_to_bytes(t1 ^ round_keys[1], plaintext + 4);
+    uint32_to_bytes(t2 ^ round_keys[2], plaintext + 8);
+    uint32_to_bytes(t3 ^ round_keys[3], plaintext + 12);
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2">이 코드는 <code>decrypt_block</code> 함수의 마지막 부분으로, 복호화의 **마지막 라운드**를 처리함.</li>
+                            <li class="mb-2">복호화의 마지막 라운드에서는 <code>InvMixColumns</code>를 수행하지 않으므로 T-Table을 사용하지 않음.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">t0 = ...:</strong> 이전 상태의 첫 번째 열을 계산함.
+                                <ul class="list-disc pl-6 mt-1">
+                                    <li><code>inv_s_box[...]</code>: <code>InvSubBytes</code> 단계를 수행함.</li>
+                                    <li>바이트를 가져오는 위치와 조합하는 방식이 <code>InvShiftRows</code> 단계를 동시에 수행함.</li>
+                                </ul>
+                            </li>
+                            <li class="mb-2"><strong class="text-cyan-400">uint32_to_bytes(...):</strong> <code>InvSubBytes</code>/<code>ShiftRows</code> 결과에 암호화의 *첫 번째* 라운드 키를 XOR하고(<code>AddRoundKey</code>), 최종 결과를 바이트로 변환하여 <code>plaintext</code> 배열에 저장하면 원본 평문이 복원됨.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 14: 상수 테이블 초기화',
+                    code: `const uint8_t AES_Optimized::s_box[256] = {
+    0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, /* ... */
+};
+
+const uint8_t AES_Optimized::inv_s_box[256] = {
+    0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38, /* ... */
+};
+
+const uint8_t AES_Optimized::Rcon[11] = {
+    0x00, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36
+};`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2">이 부분은 클래스 선언부에서 <code>static const</code>로 선언했던 상수 테이블들을 실제로 초기화하는 코드임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">s_box:</strong> <code>SubBytes</code> 단계에서 바이트 치환에 사용되는 Substitution Box를 FIPS-197 표준에 따라 정의함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">inv_s_box:</strong> <code>InvSubBytes</code> 단계에서 사용되는 역 S-Box를 정의함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">Rcon:</strong> <code>KeyExpansion</code> 과정에서 각 라운드에 더해지는 라운드 상수를 정의함.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 15: main 함수 (테스트 준비)',
+                    code: `void print_hex_array(...) { /* ... */ }
+
+int main() {
+    uint8_t key[16] = {
+        0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+        0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c
+    };
+    uint8_t plaintext[16] = {
+        0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d,
+        0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34
+    };
+    uint8_t expected_ciphertext[16] = {
+        0x39, 0x25, 0x84, 0x1d, 0x02, 0xdc, 0x09, 0xfb,
+        0xdc, 0x11, 0x85, 0x97, 0x19, 0x6a, 0x0b, 0x32
+    };
+
+    uint8_t ciphertext[16];
+    uint8_t decrypted_plaintext[16];
+    // ...
+}`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">print_hex_array:</strong> 바이트 배열을 16진수로 출력하는 헬퍼 함수임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">int main():</strong> 프로그램의 실행 시작점임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">key, plaintext, expected_ciphertext:</strong> 구현된 AES 코드가 올바르게 동작하는지 검증하기 위한 테스트 데이터임. 이 값들은 NIST의 FIPS-197 표준 문서 부록 B에 명시된 공식 AES-128 테스트 벡터임.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">ciphertext, decrypted_plaintext:</strong> 암호화 및 복호화 결과를 저장할 배열을 선언함.</li>
+                        </ul>
+                    `
+                },
+                {
+                    title: '슬라이드 16: main 함수 (실행 및 검증)',
+                    code: `try {
+    AES_Optimized aes(key, 128);
+
+    aes.encrypt_block(plaintext, ciphertext);
+    print_hex_array("Encrypted Ciphertext:", ciphertext, 16);
+    print_hex_array("Expected Ciphertext: ", expected_ciphertext, 16);
+    
+    aes.decrypt_block(ciphertext, decrypted_plaintext);
+    print_hex_array("Decrypted Plaintext: ", decrypted_plaintext, 16);
+    print_hex_array("Original Plaintext:  ", plaintext, 16);
+
+    bool ciphertext_match = (memcmp(ciphertext, expected_ciphertext, 16) == 0);
+    bool plaintext_match = (memcmp(plaintext, decrypted_plaintext, 16) == 0);
+
+    if (ciphertext_match && plaintext_match) {
+        std::cout << "\\nSuccess: NIST FIPS-197 test vector passed." << std::endl;
+    } else {
+        std::cout << "\\nError: NIST FIPS-197 test vector failed." << std::endl;
+    }
+
+} catch (const std::exception& e) { /* ... */ }`,
+                    explanation: `
+                        <ul>
+                            <li class="mb-2"><strong class="text-cyan-400">try-catch:</strong> 생성자에서 발생할 수 있는 예외(예: 잘못된 키 길이)를 처리함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">AES_Optimized aes(key, 128):</strong> 128비트 키로 AES 객체를 생성함. T-Table과 라운드 키가 이 때 준비됨.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">encrypt_block / decrypt_block:</strong> 평문을 암호화하고, 그 결과를 다시 복호화함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">print_hex_array:</strong> 각 단계의 입력과 출력을 16진수로 출력하여 과정을 확인함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">memcmp(...):</strong> 메모리 비교 함수. 암호화 결과가 예상 값과 같은지, 복호화 결과가 원본 평문과 같은지 바이트 단위로 정확하게 비교함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">if (...):</strong> 두 비교 결과가 모두 참이면 테스트 성공 메시지를, 아니면 실패 메시지를 출력함.</li>
+                        </ul>
+                    `
+                }
+            ];
+
+            const viewer = document.getElementById('slide-viewer');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const slideCounter = document.getElementById('slide-counter');
+            let currentSlide = 0;
+
+            // 슬라이드 HTML 생성 및 삽입
+            slideData.forEach((data, index) => {
+                const isFullCodeSlide = index === 0;
+                const slideEl = document.createElement('div');
+                slideEl.className = 'slide p-6 sm:p-8 w-full';
+                if (index > 0) slideEl.classList.add('hidden');
+                
+                const gridLayout = isFullCodeSlide 
+                    ? `<div class="grid grid-cols-1 h-full">
+                          <div class="code-container relative overflow-auto scroll-container" style="max-height: calc(60vh - 120px);">
+                              <button class="copy-btn absolute top-2 right-2 z-10 bg-gray-600 hover:bg-cyan-500 text-white font-semibold py-1 px-3 rounded-md text-sm transition-all duration-200">복사</button>
+                              <pre class="h-full"><code class="language-cpp">${data.code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>
+                          </div>
+                       </div>
+                       <div class="mt-4">${data.explanation}</div>`
+                    : `<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 h-full">
+                          <div class="code-container relative overflow-auto scroll-container" style="max-height: calc(60vh - 120px);">
+                              <button class="copy-btn absolute top-2 right-2 z-10 bg-gray-600 hover:bg-cyan-500 text-white font-semibold py-1 px-3 rounded-md text-sm transition-all duration-200">복사</button>
+                              <pre class="h-full"><code class="language-cpp">${data.code.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</code></pre>
+                          </div>
+                          <div class="explanation-container bg-gray-900 p-4 rounded-lg overflow-y-auto scroll-container" style="max-height: calc(60vh - 120px);">
+                              <h3 class="text-xl font-semibold text-gray-100 mb-3">코드 설명</h3>
+                              <div class="text-gray-300 leading-relaxed">${data.explanation}</div>
+                          </div>
+                       </div>`;
+
+                slideEl.innerHTML = `
+                    <h2 class="text-2xl font-bold text-cyan-300 mb-4">${data.title}</h2>
+                    ${gridLayout}
+                `;
+                viewer.appendChild(slideEl);
+            });
+
+            const slides = document.querySelectorAll('.slide');
+
+            function showSlide(index) {
+                slides.forEach((slide, i) => {
+                    slide.classList.toggle('hidden', i !== index);
+                });
+                
+                slideCounter.textContent = `${index + 1} / ${slides.length}`;
+                prevBtn.disabled = index === 0;
+                nextBtn.disabled = index === slides.length - 1;
+                Prism.highlightAll();
+            }
+
+            viewer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('copy-btn')) {
+                    const btn = e.target;
+                    const codeContainer = btn.closest('.code-container');
+                    const codeEl = codeContainer.querySelector('code');
+                    if (codeEl) {
+                        const codeToCopy = codeEl.innerText;
+                        
+                        // Use document.execCommand for better iframe compatibility
+                        const textArea = document.createElement('textarea');
+                        textArea.value = codeToCopy;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        try {
+                            document.execCommand('copy');
+                            btn.textContent = '복사 완료!';
+                            setTimeout(() => {
+                                btn.textContent = '복사';
+                            }, 2000);
+                        } catch (err) {
+                            console.error('클립보드 복사 실패:', err);
+                            btn.textContent = '복사 실패';
+                        }
+                        document.body.removeChild(textArea);
+                    }
+                }
+            });
+
+            prevBtn.addEventListener('click', () => {
+                if (currentSlide > 0) {
+                    currentSlide--;
+                    showSlide(currentSlide);
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentSlide < slides.length - 1) {
+                    currentSlide++;
+                    showSlide(currentSlide);
+                }
+            });
+
+            showSlide(currentSlide);
+        });
+    </script>
+</body>
+</html>
+
