@@ -652,7 +652,7 @@ public:
 }`,
                     explanation: `
                         <ul>
-                            <li class="mb-2">이 코드는 <code>encrypt_block</code> 함수의 마지막 부분으로, **마지막 라운드**를 처리함.</li>
+                            <li class="mb-2">이 코드는 <code>encrypt_block</code> 함수의 마지막 부분으로, 마지막 라운드를 처리함.</li>
                             <li class="mb-2">AES 표준에 따라 마지막 라운드에서는 <code>MixColumns</code>를 수행하지 않으므로, T-Table을 사용하지 않음.</li>
                             <li class="mb-2"><strong class="text-cyan-400">t0 = ...:</strong> 다음 상태의 첫 번째 열(<code>t0</code>)을 계산함.
                                 <ul class="list-disc pl-6 mt-1">
@@ -714,7 +714,7 @@ public:
 }`,
                     explanation: `
                         <ul>
-                            <li class="mb-2">이 코드는 <code>decrypt_block</code> 함수의 마지막 부분으로, 복호화의 **마지막 라운드**를 처리함.</li>
+                            <li class="mb-2">이 코드는 <code>decrypt_block</code> 함수의 마지막 부분으로, 복호화의 마지막 라운드를 처리함.</li>
                             <li class="mb-2">복호화의 마지막 라운드에서는 <code>InvMixColumns</code>를 수행하지 않으므로 T-Table을 사용하지 않음.</li>
                             <li class="mb-2"><strong class="text-cyan-400">t0 = ...:</strong> 이전 상태의 첫 번째 열을 계산함.
                                 <ul class="list-disc pl-6 mt-1">
