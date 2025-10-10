@@ -685,7 +685,7 @@ public:
                     explanation: `
                         <ul>
                             <li class="mb-2"><strong class="text-cyan-400">decrypt_block:</strong> 16바이트 암호문 블록을 복호화하는 함수임.</li>
-                            <li class="mb-2"><strong class="text-cyan-400">초기 라운드:</strong> 암호문을 워드로 변환하고, 암호화의 *마지막* 라운드 키와 XOR하여 <code>AddRoundKey</code>를 수행함.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">초기 라운드:</strong> 암호문을 워드로 변환하고, 암호화의 마지막 라운드 키와 XOR하여 <code>AddRoundKey</code>를 수행함.</li>
                             <li class="mb-2"><strong class="text-cyan-400">메인 라운드 (for loop):</strong> 역순으로 반복함.</li>
                             <li class="mb-2"><strong class="text-cyan-400">t0 = ...:</strong> 복호화 T-Table(<code>Td</code>)을 사용하여 이전 상태의 첫 번째 열을 계산함.
                                 <ul class="list-disc pl-6 mt-1">
@@ -722,7 +722,7 @@ public:
                                     <li>바이트를 가져오는 위치와 조합하는 방식이 <code>InvShiftRows</code> 단계를 동시에 수행함.</li>
                                 </ul>
                             </li>
-                            <li class="mb-2"><strong class="text-cyan-400">uint32_to_bytes(...):</strong> <code>InvSubBytes</code>/<code>ShiftRows</code> 결과에 암호화의 *첫 번째* 라운드 키를 XOR하고(<code>AddRoundKey</code>), 최종 결과를 바이트로 변환하여 <code>plaintext</code> 배열에 저장하면 원본 평문이 복원됨.</li>
+                            <li class="mb-2"><strong class="text-cyan-400">uint32_to_bytes(...):</strong> <code>InvSubBytes</code>/<code>ShiftRows</code> 결과에 암호화의 첫 번째 라운드 키를 XOR하고(<code>AddRoundKey</code>), 최종 결과를 바이트로 변환하여 <code>plaintext</code> 배열에 저장하면 원본 평문이 복원됨.</li>
                         </ul>
                     `
                 },
