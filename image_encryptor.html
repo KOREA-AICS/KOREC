@@ -98,7 +98,7 @@
                     <div class="relative code-block rounded-lg p-4">
                         <code id="pip-command">pip install cryptography</code>
                         <button class="copy-btn absolute top-2 right-2 p-2 rounded-md" data-clipboard-target="pip-command" title="복사하기">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 S0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                         </button>
                     </div>
                 </div>
@@ -119,8 +119,25 @@ NIST_KEY = b'\x2b\x7e\x15\x16\x28\xae\xd2\xa6\xab\xf7\x15\x88\x09\xcf\x4f\x3c'</
                     </div>
                     
                     <div class="mt-4 pt-4 border-t border-slate-200">
-                        <h4 class="font-semibold text-slate-800">초기화 벡터 (IV)란?</h4>
-                        <p class="text-slate-600 mt-2">IV는 Cipher Block Chaining(CBC) 모드와 같은 블록 암호 운영 방식에서 사용되는 초기값입니다. 첫 번째 데이터 블록을 암호화하기 전에, 이 블록은 IV와 XOR 연산됩니다. 이 과정 덕분에 동일한 내용의 데이터 블록이라도 암호문 상에서는 서로 다른 결과로 나타나게 되어 보안성이 향상됩니다. 이 실습에서는 모든 학생이 동일한 암호 파일을 복호화해야 하므로, 암호화에 사용된 것과 동일한 아래의 고정 IV 값을 사용해야 합니다.</p>
+                        <h4 class="font-semibold text-slate-800">CBC 모드와 초기화 벡터(IV)</h4>
+                        <p class="text-slate-600 mt-2">
+                            <strong>Cipher Block Chaining (CBC)</strong>은 가장 널리 사용되는 블록 암호 운영 모드 중 하나입니다. 이름의 'Chaining(연쇄)'이 핵심 아이디어로, 각 데이터 블록을 암호화할 때 이전 블록의 암호화 결과에 영향을 받도록 만듭니다. 이 방식은 단순 모드(ECB)의 보안 취약점을 해결합니다.
+                        </p>
+                        <div class="my-4 p-4 bg-slate-100 rounded-lg text-center">
+                            <p class="font-mono text-sm text-slate-700">
+                                [Plaintext-1 ⊕ IV] → <span class="text-amber-600 font-bold">AES Encrypt</span> → [Ciphertext-1]<br>
+                                <span class="text-2xl text-slate-400">↓</span><br>
+                                [Plaintext-2 ⊕ Ciphertext-1] → <span class="text-amber-600 font-bold">AES Encrypt</span> → [Ciphertext-2]<br>
+                                <span class="text-2xl text-slate-400">↓</span><br>
+                                ...
+                            </p>
+                        </div>
+                        <p class="text-slate-600 mt-2">
+                            <strong>초기화 벡터 (IV)</strong>는 바로 이 '연쇄' 과정의 시작을 위해 사용되는 초기값입니다. 첫 번째 데이터 블록은 의존할 이전 암호문이 없으므로, IV와 XOR 연산을 수행합니다. 이 과정 덕분에 동일한 메시지를 동일한 키로 여러 번 암호화하더라도 매번 다른 암호문이 생성되어 보안성이 크게 향상됩니다.
+                        </p>
+                         <p class="text-slate-600 mt-2">
+                            이번 실습에서는 암호화에 사용된 것과 동일한 아래의 고정 IV 값을 사용해야만 올바른 복호화가 가능합니다.
+                        </p>
                     </div>
                      <div class="relative code-block rounded-lg p-4 my-3">
                         <code id="iv-value"># Educational Fixed IV
