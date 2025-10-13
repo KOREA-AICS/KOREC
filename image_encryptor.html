@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AES-CBC 이미지 암호화 실습 과제</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chosen Palette: Warm Neutrals -->
+    <!-- Application Structure Plan: The SPA is designed as a single-page, top-down guided tutorial, improving upon the original report's linear text format. This structure was chosen for its intuitiveness for students following a technical procedure. The content is segmented into four logical, visually distinct sections: 1) Objective, 2) Prerequisites, 3) Procedure, and 4) Verification & Discussion. This step-by-step flow minimizes cognitive load. Key interactions include 'copy-to-clipboard' buttons for commands to reduce user error, and a final interactive toggle simulation. This simulation is the centerpiece, designed to let users actively explore the core concept (the effect of a fixed vs. random IV) in a way static text cannot, thus enhancing synthesis and understanding. -->
+    <!-- Visualization & Content Choices: The report's content is primarily instructional text and code snippets.
+- Report Info: Prerequisites & Procedure steps. Goal: Instruct. Presentation: Styled checklists and numbered lists with embedded code blocks. Interaction: "Copy" buttons for shell commands to improve usability. Justification: Reduces typing errors for students. Library/Method: Vanilla JS.
+- Report Info: Core concept of deterministic encryption. Goal: Synthesize/Explain. Presentation: A custom-built interactive diagram. Interaction: A toggle button ("IV 모드 변경") that switches between "고정 IV" and "무작위 IV" scenarios. It dynamically updates the diagram's text and visual elements (colors, icons) to contrast the outcomes (same vs. different encrypted files). Justification: This interactive element directly visualizes the report's main learning objective, making an abstract concept tangible and memorable. Library/Method: HTML/Tailwind for structure, Vanilla JS for state management and DOM updates.
+- CONFIRMATION: NO charts (Chart.js/Plotly) were used as the source material is qualitative and procedural, not quantitative data. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+        }
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        .step-counter {
+            background-color: #fde68a; /* amber-200 */
+            color: #ca8a04; /* amber-600 */
+        }
+        .code-block {
+            background-color: #1e293b; /* slate-800 */
+            color: #e2e8f0; /* slate-200 */
+            font-family: 'D2Coding', monospace;
+            white-space: pre-wrap;
+            word-break: break-all; /* UI 깨짐 방지를 위해 강제 줄바꿈 추가 */
+        }
+        .copy-btn {
+            background-color: #334155; /* slate-700 */
+            color: #94a3b8; /* slate-400 */
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .copy-btn:hover {
+            background-color: #475569; /* slate-600 */
+            color: #cbd5e1; /* slate-300 */
+        }
+        .toast {
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+    </style>
+</head>
+<body class="bg-amber-50 text-slate-800">
+
+    <div id="toast-notification" class="toast fixed top-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg">
+        클립보드에 복사되었습니다!
+    </div>
+
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        
+        <header class="text-center mb-16">
+            <h1 class="text-4xl sm:text-5xl font-bold text-slate-900 leading-tight">AES-CBC 이미지 암호화 실습</h1>
+            <p class="mt-4 text-lg text-slate-600">고정된 키(Key)와 초기화 벡터(IV)의 역할을 이해하는 체험형 과제</p>
+        </header>
+
+        <!-- Section 1: 과제 목표 -->
+        <section id="objective" class="mb-16">
+            <h2 class="text-3xl font-bold text-slate-900 border-b-4 border-amber-300 pb-2 mb-6">1. 과제 목표</h2>
+            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md space-y-4 text-slate-700 text-base sm:text-lg">
+                <p>이번 실습의 핵심 목표는 AES 암호화의 중요한 두 가지 개념을 직접 체험하며 이해하는 것입니다. 제공된 파이썬 스크립트로 이미지 파일을 암호화하며 아래 두 가지를 확인합니다.</p>
+                <ul class="list-none space-y-4 mt-4">
+                    <li class="flex items-start">
+                        <span class="text-2xl mr-4 text-amber-500">🎯</span>
+                        <div>
+                            <strong class="font-semibold text-slate-800">결과 재현성 확인:</strong> 모든 학생이 동일한 스크립트와 이미지로 암호화를 수행했을 때, 생성되는 암호 파일의 이름과 내용이 <strong class="text-amber-600">완벽히 동일하게 나옴</strong>을 확인합니다.
+                        </div>
+                    </li>
+                    <li class="flex items-start">
+                        <span class="text-2xl mr-4 text-amber-500">🧠</span>
+                        <div>
+                            <strong class="font-semibold text-slate-800">결정론적 암호화 학습:</strong> 왜 결과가 동일하게 나오는지, 즉 암호화 과정에서 <strong class="text-amber-600">키(Key)와 초기화 벡터(IV)가 고정</strong>되었을 때 암호화 결과가 항상 동일한 '결정적인(deterministic)' 결과로 이어지는 원리를 학습합니다.
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Section 2: 사전 준비물 -->
+        <section id="prerequisites" class="mb-16">
+            <h2 class="text-3xl font-bold text-slate-900 border-b-4 border-amber-300 pb-2 mb-6">2. 사전 준비물</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-xl text-slate-800 mb-3">1. Python 3 설치</h3>
+                    <p class="text-slate-600 mb-4">운영체제에 맞는 최신 버전을 설치하세요. 설치 시 <code class="bg-amber-100 text-amber-800 px-1 rounded">Add Python to PATH</code> 옵션을 꼭 체크해야 합니다.</p>
+                    <a href="https://www.python.org/downloads/" target="_blank" class="inline-block bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition">Python 공식 웹사이트 →</a>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-xl text-slate-800 mb-3">2. `cryptography` 라이브러리 설치</h3>
+                    <p class="text-slate-600 mb-4">터미널(CMD, PowerShell)을 열고 아래 명령어를 입력하여 암호화 라이브러리를 설치합니다.</p>
+                    <div class="relative code-block rounded-lg p-4">
+                        <code id="pip-command">pip install cryptography</code>
+                        <button class="copy-btn absolute top-2 right-2 p-2 rounded-md" data-clipboard-target="pip-command" title="복사하기">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-xl text-slate-800 mb-3">3. 실습용 스크립트</h3>
+                    <p class="text-slate-600">제공된 <code class="bg-amber-100 text-amber-800 px-1 rounded">image_encryptor_fixed_iv.py</code> 파일을 다운로드합니다.</p>
+                </div>
+                 <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h3 class="font-bold text-xl text-slate-800 mb-3">4. 실습용 이미지</h3>
+                    <p class="text-slate-600 mb-4">아래 링크에서 이미지를 다운로드 후, 파일명을 <strong class="text-red-600">`test_image.png`</strong>로 정확히 변경하세요.</p>
+                    <a href="https://placehold.co/100x100/333333/FFFFFF/png?text=AES_TEST" target="_blank" class="inline-block bg-sky-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-sky-700 transition">테스트 이미지 다운로드 →</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: 실습 절차 -->
+        <section id="procedure" class="mb-16">
+            <h2 class="text-3xl font-bold text-slate-900 border-b-4 border-amber-300 pb-2 mb-6">3. 실습 절차</h2>
+            <ol class="space-y-6">
+                <li class="flex items-start">
+                    <div class="step-counter flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold mr-4 mt-1">1</div>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex-grow">
+                        <h3 class="font-bold text-xl text-slate-800 mb-2">폴더 생성 및 파일 준비</h3>
+                        <p class="text-slate-600">바탕화면 등 찾기 쉬운 곳에 <code class="bg-amber-100 text-amber-800 px-1 rounded">AES-실습</code> 폴더를 만들고, 그 안에 다운로드한 <code class="bg-amber-100 text-amber-800 px-1 rounded">스크립트</code>와 <code class="bg-amber-100 text-amber-800 px-1 rounded">이미지 파일</code>을 넣습니다.</p>
+                    </div>
+                </li>
+                 <li class="flex items-start">
+                    <div class="step-counter flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold mr-4 mt-1">2</div>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex-grow">
+                        <h3 class="font-bold text-xl text-slate-800 mb-2">터미널에서 폴더로 이동</h3>
+                        <p class="text-slate-600 mb-3">터미널을 열고 <code class="bg-amber-100 text-amber-800 px-1 rounded">cd</code> 명령어로 <code class="bg-amber-100 text-amber-800 px-1 rounded">AES-실습</code> 폴더로 이동합니다. (아래는 예시)</p>
+                        <div class="relative code-block rounded-lg p-4">
+                            <code id="cd-command">cd Desktop/AES-실습</code>
+                            <button class="copy-btn absolute top-2 right-2 p-2 rounded-md" data-clipboard-target="cd-command" title="복사하기">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                </li>
+                 <li class="flex items-start">
+                    <div class="step-counter flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold mr-4 mt-1">3</div>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex-grow">
+                        <h3 class="font-bold text-xl text-slate-800 mb-2">스크립트 실행</h3>
+                        <p class="text-slate-600 mb-3">폴더로 이동한 터미널에서 아래 명령어를 입력하여 암호화 도구를 실행합니다.</p>
+                        <div class="relative code-block rounded-lg p-4">
+                            <code id="python-command">python image_encryptor_fixed_iv.py</code>
+                            <button class="copy-btn absolute top-2 right-2 p-2 rounded-md" data-clipboard-target="python-command" title="복사하기">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                </li>
+                <li class="flex items-start">
+                    <div class="step-counter flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold mr-4 mt-1">4</div>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex-grow">
+                        <h3 class="font-bold text-xl text-slate-800 mb-2">암호화 수행</h3>
+                        <p class="text-slate-600">GUI 창이 나타나면 <code class="bg-amber-100 text-amber-800 px-1 rounded">파일 선택</code> 버튼으로 <code class="bg-amber-100 text-amber-800 px-1 rounded">test_image.png</code>를 선택한 뒤 <code class="bg-amber-100 text-amber-800 px-1 rounded">암호화</code> 버튼을 누릅니다.</p>
+                    </div>
+                </li>
+            </ol>
+        </section>
+
+        <!-- Section 4: 결과 확인 및 토의 -->
+        <section id="discussion">
+            <h2 class="text-3xl font-bold text-slate-900 border-b-4 border-amber-300 pb-2 mb-6">4. 결과 확인 및 토의</h2>
+            <div class="bg-white p-6 sm:p-8 rounded-xl shadow-md space-y-4">
+                <p class="text-slate-700">암호화가 완료되면 <code class="bg-amber-100 text-amber-800 px-1 rounded">AES-실습</code> 폴더에 `.enc` 확장자를 가진 파일이 생성됩니다. 이 파일을 통해 암호화의 원리를 탐구해봅시다.</p>
+                
+                <div class="mt-8 p-6 bg-slate-50 rounded-lg border border-slate-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-6">
+                        <h3 class="text-xl font-bold text-slate-800 mb-4 sm:mb-0">IV 역할 시뮬레이션</h3>
+                        <button id="iv-toggle-btn" class="w-full sm:w-auto bg-amber-500 text-white font-semibold py-2 px-5 rounded-lg hover:bg-amber-600 transition">IV 모드 변경: 무작위 IV</button>
+                    </div>
+                    
+                    <div id="simulation-diagram" class="grid grid-cols-1 md:grid-cols-5 items-center gap-4 text-center">
+                        <!-- Student A -->
+                        <div class="flex flex-col items-center">
+                            <span class="text-4xl">🧑‍🎓</span>
+                            <p class="text-sm font-semibold">학생 A</p>
+                            <div class="w-20 h-20 bg-slate-200 flex items-center justify-center rounded-lg mt-2">
+                                <span class="text-3xl">🖼️</span>
+                            </div>
+                            <p class="text-xs text-slate-500 mt-1">test_image.png</p>
+                        </div>
+                        
+                        <div class="text-3xl font-mono text-slate-400">+</div>
+
+                        <!-- IV Display -->
+                        <div class="flex flex-col items-center">
+                            <div id="iv-icon" class="text-5xl transition-transform duration-300">🔗</div>
+                            <p id="iv-label" class="text-lg font-bold text-amber-600 mt-2">고정 IV</p>
+                            <p id="iv-desc" class="text-sm text-slate-500 mt-1">모두 동일한 값 사용</p>
+                        </div>
+
+                        <div class="text-3xl font-mono text-slate-400">→</div>
+
+                        <!-- Result -->
+                        <div class="flex flex-col items-center">
+                             <div id="result-icon-container" class="w-20 h-20 flex items-center justify-center rounded-lg mt-2 transition-colors duration-300 bg-green-100">
+                                <span class="text-3xl">📄</span>
+                            </div>
+                            <p id="result-filename" class="text-xs text-green-700 font-mono mt-1 break-all">f8a1b2... .enc</p>
+                            <p id="result-desc" class="text-sm font-bold text-green-600 mt-2">모두 동일한 결과</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pt-6 space-y-3 text-slate-700">
+                    <p><strong class="font-semibold text-slate-800">(중요) 결과 비교:</strong> 옆 사람과 생성된 `.enc` 파일의 이름(해시값)이 완전히 같은지 확인해보세요. <strong id="discussion-point" class="text-green-600 font-semibold">이 시뮬레이션의 '고정 IV' 상태처럼, 모두의 결과가 동일해야 정상입니다.</strong></p>
+                    <p>
+                        <strong class="font-semibold text-slate-800">토의점:</strong> 왜 모두의 결과가 동일하게 나왔을까요? 만약 IV가 '무작위'였다면 어떻게 달랐을까요? 'IV 모드 변경' 버튼을 눌러보며 그 차이를 시각적으로 확인하고, 그 이유에 대해 토의해보세요.
+                    </p>
+                    <p><strong class="font-semibold text-slate-800">복호화 확인:</strong> 마지막으로, 암호화 도구에서 생성된 `.enc` 파일을 선택하고 `복호화` 버튼을 눌러 원본 이미지가 정상적으로 복원되는지 확인하며 실습을 마무리합니다.</p>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer class="text-center py-8 text-slate-500 text-sm">
+        <p>Interactive Learning Module for AES-CBC Concepts.</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Clipboard Copy Logic ---
+            const copyButtons = document.querySelectorAll('.copy-btn');
+            const toast = document.getElementById('toast-notification');
+
+            copyButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const targetId = button.dataset.clipboardTarget;
+                    const targetElement = document.getElementById(targetId);
+                    if (targetElement) {
+                        navigator.clipboard.writeText(targetElement.innerText)
+                            .then(() => {
+                                toast.classList.add('show');
+                                setTimeout(() => {
+                                    toast.classList.remove('show');
+                                }, 2000);
+                            })
+                            .catch(err => {
+                                console.error('Failed to copy text: ', err);
+                            });
+                    }
+                });
+            });
+
+            // --- IV Simulation Logic ---
+            const toggleBtn = document.getElementById('iv-toggle-btn');
+            const ivIcon = document.getElementById('iv-icon');
+            const ivLabel = document.getElementById('iv-label');
+            const ivDesc = document.getElementById('iv-desc');
+            const resultIconContainer = document.getElementById('result-icon-container');
+            const resultFilename = document.getElementById('result-filename');
+            const resultDesc = document.getElementById('result-desc');
+            const discussionPoint = document.getElementById('discussion-point');
+
+            let isIvRandom = false;
+
+            const updateSimulationView = () => {
+                if (isIvRandom) {
+                    // State: Random IV
+                    toggleBtn.textContent = 'IV 모드 변경: 고정 IV';
+                    ivIcon.textContent = '🎲';
+                    ivIcon.classList.add('rotate-180');
+                    ivLabel.textContent = '무작위 IV';
+                    ivLabel.classList.remove('text-amber-600');
+                    ivLabel.classList.add('text-sky-600');
+                    ivDesc.textContent = '모두 다른 값 사용';
+                    
+                    resultIconContainer.classList.remove('bg-green-100');
+                    resultIconContainer.classList.add('bg-red-100');
+                    resultFilename.textContent = '???... .enc';
+                    resultFilename.classList.remove('text-green-700');
+                    resultFilename.classList.add('text-red-700');
+                    resultDesc.textContent = '모두 다른 결과';
+                    resultDesc.classList.remove('text-green-600');
+                    resultDesc.classList.add('text-red-600');
+                    
+                    discussionPoint.textContent = "이 시뮬레이션의 '무작위 IV' 상태처럼, IV가 매번 달라지면 최종 암호문도 모두 달라집니다.";
+                    discussionPoint.classList.remove('text-green-600');
+                    discussionPoint.classList.add('text-red-600');
+
+                } else {
+                    // State: Fixed IV
+                    toggleBtn.textContent = 'IV 모드 변경: 무작위 IV';
+                    ivIcon.textContent = '🔗';
+                    ivIcon.classList.remove('rotate-180');
+                    ivLabel.textContent = '고정 IV';
+                    ivLabel.classList.remove('text-sky-600');
+                    ivLabel.classList.add('text-amber-600');
+                    ivDesc.textContent = '모두 동일한 값 사용';
+                    
+                    resultIconContainer.classList.remove('bg-red-100');
+                    resultIconContainer.classList.add('bg-green-100');
+                    resultFilename.textContent = 'f8a1b2... .enc';
+                    resultFilename.classList.remove('text-red-700');
+                    resultFilename.classList.add('text-green-700');
+                    resultDesc.textContent = '모두 동일한 결과';
+                    resultDesc.classList.remove('text-red-600');
+                    resultDesc.classList.add('text-green-600');
+
+                    discussionPoint.textContent = "이 시뮬레이션의 '고정 IV' 상태처럼, 모두의 결과가 동일해야 정상입니다.";
+                    discussionPoint.classList.remove('text-red-600');
+                    discussionPoint.classList.add('text-green-600');
+                }
+            };
+
+            toggleBtn.addEventListener('click', () => {
+                isIvRandom = !isIvRandom;
+                updateSimulationView();
+            });
+        });
+    </script>
+</body>
+</html>
+
