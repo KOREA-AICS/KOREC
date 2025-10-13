@@ -28,7 +28,9 @@ def encrypt_file(file_path):
         key = NIST_KEY
 
         # 3. 초기화 벡터(IV) 생성 및 암호화기 설정
-        iv = os.urandom(IV_SIZE)
+        #iv = os.urandom(IV_SIZE)
+        #fixed iv for practice
+        iv = b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\x09\x0a\x0b\x0c\x0d\x0e\x0f'
         cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         
         # 4. 데이터 패딩 (PKCS7) - 이미지 데이터와 파일명 모두에 적용
