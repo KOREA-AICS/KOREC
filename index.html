@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A Journey Through Modern Cryptography</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #002D47;
+            color: #F2F2F2;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 320px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .flow-arrow {
+            font-size: 2rem;
+            color: #00A1E4;
+        }
+        .step-box {
+            border: 2px solid #0077C0;
+            background-color: #005082;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <main class="p-4 md:p-8">
+        <header class="text-center mb-16">
+            <h1 class="text-4xl md:text-6xl font-bold text-white mb-4">A Journey Through Modern Cryptography</h1>
+            <p class="text-lg md:text-xl text-blue-200 max-w-3xl mx-auto">From ancient secrets to the digital fortress of today, discover the essential concepts that protect our online world.</p>
+        </header>
+
+        <section id="module1" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-10 border-b-2 border-blue-500 pb-2">Module 1: The Foundations of Secrecy</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6 text-center">
+                    <h3 class="text-2xl font-semibold mb-2 text-cyan-300">Confidentiality</h3>
+                    <p class="text-blue-200">Ensuring that only authorized individuals can access information. The principle of keeping data secret.</p>
+                </div>
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6 text-center">
+                    <h3 class="text-2xl font-semibold mb-2 text-cyan-300">Integrity</h3>
+                    <p class="text-blue-200">Guaranteeing that data has not been altered or destroyed in an unauthorized manner.</p>
+                </div>
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6 text-center">
+                    <h3 class="text-2xl font-semibold mb-2 text-cyan-300">Availability</h3>
+                    <p class="text-blue-200">Ensuring that systems and data are accessible to authorized users when needed.</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">Classical Ciphers: The Weakness</h3>
+                    <p class="mb-4 text-blue-200">Early ciphers like the Caesar Cipher were simple substitutions. While clever for their time, they contained a fatal flaw: they preserved the statistical patterns of the original language.</p>
+                    <div class="chart-container">
+                        <canvas id="freqChart"></canvas>
+                    </div>
+                    <p class="mt-4 text-center text-blue-300">A bar chart showing the relative frequency of letters in English text. The high frequency of 'E' makes simple substitution ciphers easy to break with frequency analysis.</p>
+                </div>
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6 flex flex-col justify-center">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">Caesar Cipher Example</h3>
+                    <div class="text-center">
+                        <p class="text-lg text-blue-200">Plaintext:</p>
+                        <p class="text-2xl font-mono tracking-widest bg-gray-700/50 p-2 rounded">CRYPTO</p>
+                        <p class="my-4 text-2xl">↓ (Shift by 3)</p>
+                        <p class="text-lg text-blue-200">Ciphertext:</p>
+                        <p class="text-2xl font-mono tracking-widest bg-gray-700/50 p-2 rounded text-cyan-400">FUBSWR</p>
+                    </div>
+                    <p class="mt-6 text-blue-300">This predictability is why modern cryptography was needed.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="module2" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-10 border-b-2 border-blue-500 pb-2">Module 2: The Modern Standard - AES</h2>
+            <p class="text-lg text-center max-w-3xl mx-auto mb-12 text-blue-200">Modern symmetric ciphers operate on blocks of data, applying complex transformations in multiple rounds. The Advanced Encryption Standard (AES) is the global standard, trusted to protect sensitive information worldwide.</p>
+            <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                <h3 class="text-2xl font-semibold mb-6 text-center">Inside an AES Round: A Four-Step Dance</h3>
+                <div class="flex flex-col md:flex-row items-center justify-center space-y-4 md:space-y-0 md:space-x-4">
+                    <div class="step-box"><span>1. SubBytes</span><p class="text-sm font-normal text-blue-300">Substitute bytes using a predefined table (S-box) to create confusion.</p></div>
+                    <div class="flow-arrow hidden md:block">→</div>
+                    <div class="flow-arrow md:hidden">↓</div>
+                    <div class="step-box"><span>2. ShiftRows</span><p class="text-sm font-normal text-blue-300">Shift rows of the data matrix to diffuse data across columns.</p></div>
+                     <div class="flow-arrow hidden md:block">→</div>
+                    <div class="flow-arrow md:hidden">↓</div>
+                    <div class="step-box"><span>3. MixColumns</span><p class="text-sm font-normal text-blue-300">Mix column data to further diffuse and create an avalanche effect.</p></div>
+                     <div class="flow-arrow hidden md:block">→</div>
+                    <div class="flow-arrow md:hidden">↓</div>
+                    <div class="step-box"><span>4. AddRoundKey</span><p class="text-sm font-normal text-blue-300">Combine the data with a round-specific key derived from the main secret key.</p></div>
+                </div>
+                <p class="mt-8 text-center text-blue-200">This entire process is repeated 10-14 times, making the relationship between the plaintext and ciphertext computationally infeasible to determine without the key.</p>
+            </div>
+        </section>
+
+        <section id="module3" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-10 border-b-2 border-blue-500 pb-2">Module 3: The Public-Key Revolution</h2>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">The Key Delivery Problem</h3>
+                    <p class="text-blue-200 mb-4">Symmetric ciphers like AES are fast and secure, but they have a problem: how do you safely share the secret key with the recipient in the first place? Public-key cryptography solved this.</p>
+                    <h4 class="text-xl font-semibold mb-2">Two Keys are Better Than One:</h4>
+                     <ul class="list-disc list-inside text-blue-200 space-y-2">
+                        <li><span class="font-bold text-cyan-300">Public Key 🔓:</span> Like an open padlock you give to everyone. Anyone can use it to lock a message and send it to you.</li>
+                        <li><span class="font-bold text-cyan-300">Private Key 🔑:</span> The only key that can open your padlock. You keep it secret.</li>
+                    </ul>
+                </div>
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">RSA: The Power of Primes</h3>
+                    <p class="text-blue-200">The most famous public-key algorithm, RSA, gets its security from the difficulty of factoring very large numbers. It's easy to multiply two large prime numbers, but nearly impossible to find the original primes from the product.</p>
+                     <div class="mt-4 text-center bg-gray-900/50 p-4 rounded-lg">
+                        <p class="text-sm text-blue-300">Factoring this 250-digit number (RSA-250) took thousands of computer-years:</p>
+                        <p class="text-xs break-all text-cyan-400 mt-2">214032...9497937</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="module4" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-10 border-b-2 border-blue-500 pb-2">Module 4: Ensuring Data Integrity</h2>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">The Data Fingerprint: Hash Functions</h3>
+                    <p class="text-blue-200 mb-4">A cryptographic hash function takes any input data—no matter how large—and produces a fixed-size string of characters, its unique "fingerprint" or hash. This process is one-way; you cannot get the original data back from the hash.</p>
+                     <div class="chart-container">
+                        <canvas id="hashChart"></canvas>
+                    </div>
+                    <p class="mt-4 text-center text-blue-300">Comparing the output length (digest size) of popular secure hash algorithms. Note how they produce a fixed-size output regardless of input size.</p>
+                 </div>
+                 <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">Keyed Hashing: MAC</h3>
+                     <p class="text-blue-200 mb-6">A Message Authentication Code (MAC) is a hash with a secret ingredient: a shared secret key. It proves that a message is authentic and has not been tampered with.</p>
+                     <div class="space-y-4">
+                        <div class="step-box flex-row items-center justify-start space-x-4 p-4"><span class="text-cyan-400 text-3xl">📄</span><p>Message</p></div>
+                        <div class="flex items-center justify-center space-x-4">
+                            <span class="text-4xl">+</span>
+                            <div class="step-box flex-row items-center justify-start space-x-4 p-4"><span class="text-cyan-400 text-3xl">🔑</span><p>Secret Key</p></div>
+                        </div>
+                         <div class="flex justify-center text-3xl my-2">↓</div>
+                         <div class="step-box bg-cyan-800 border-cyan-500">MAC (Authentication Tag)</div>
+                     </div>
+                 </div>
+            </div>
+        </section>
+
+        <section id="module5" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-10 border-b-2 border-blue-500 pb-2">Module 5: The Future and The Big Picture</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">The Next Generation: ECC</h3>
+                    <p class="mb-4 text-blue-200">Elliptic Curve Cryptography (ECC) provides the same level of security as RSA but with much smaller key sizes. This efficiency makes it ideal for mobile devices and IoT where processing power is limited.</p>
+                    <div class="chart-container">
+                        <canvas id="keySizeChart"></canvas>
+                    </div>
+                    <p class="mt-4 text-center text-blue-300">This chart compares the key sizes of RSA and ECC required for an equivalent level of security. ECC's advantage is clear.</p>
+                </div>
+                 <div class="bg-blue-900/50 rounded-lg shadow-xl p-6">
+                    <h3 class="text-2xl font-semibold mb-4 text-center">The Unforgeable Signature</h3>
+                    <p class="text-blue-200 mb-4">A digital signature uses public-key cryptography in reverse. By signing a message's hash with your private key, anyone can use your public key to verify that the message came from you and was not altered.</p>
+                    <h4 class="text-xl font-semibold mb-2 text-cyan-300">It provides:</h4>
+                     <ul class="list-disc list-inside text-blue-200 space-y-2">
+                        <li><span class="font-bold">Authentication:</span> Proof of who sent the message.</li>
+                        <li><span class="font-bold">Integrity:</span> Proof the message wasn't changed.</li>
+                        <li><span class="font-bold">Non-repudiation:</span> The sender cannot deny sending it.</li>
+                    </ul>
+                </div>
+            </div>
+             <div class="mt-12 bg-blue-900/50 rounded-lg shadow-xl p-6">
+                <h3 class="text-2xl font-semibold mb-6 text-center">Putting It All Together: Secure Web Browsing (HTTPS)</h3>
+                 <div class="flex flex-col space-y-4">
+                    <div class="step-box"><b>1. Authentication:</b> Your browser verifies the website's certificate using a Digital Signature.</div>
+                    <div class="flow-arrow text-center">↓</div>
+                    <div class="step-box"><b>2. Key Exchange:</b> Your browser and the server use Public-Key Crypto (like RSA or ECC) to safely agree on a temporary, secret session key.</div>
+                    <div class="flow-arrow text-center">↓</div>
+                     <div class="step-box"><b>3. Encrypted Communication:</b> All further communication is encrypted using a fast Symmetric Cipher (like AES) with the secret session key.</div>
+                    <div class="flow-arrow text-center">↓</div>
+                     <div class="step-box"><b>4. Integrity Check:</b> Every message includes a MAC to ensure it hasn't been tampered with during transit.</div>
+                 </div>
+            </div>
+        </section>
+
+    </main>
+    
+    <footer class="text-center p-8 border-t border-blue-800">
+        <p class="text-blue-300">Cryptography is a constantly evolving field, essential for protecting our digital future.</p>
+    </footer>
+
+    <script>
+        const chartColors = {
+            primary: '#00A1E4',
+            secondary: '#0077C0',
+            grid: 'rgba(0, 161, 228, 0.2)',
+            text: '#F2F2F2'
+        };
+
+        const defaultChartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: chartColors.grid },
+                    ticks: { color: chartColors.text }
+                },
+                x: {
+                    grid: { color: chartColors.grid },
+                    ticks: { color: chartColors.text }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: chartColors.text }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const item = tooltipItems[0];
+                            let label = item.chart.data.labels[item.dataIndex];
+                            if (Array.isArray(label)) {
+                              return label.join(' ');
+                            } else {
+                              return label;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        function wrapLabel(label, maxLength) {
+            if (label.length <= maxLength) {
+                return label;
+            }
+            const words = label.split(' ');
+            const lines = [];
+            let currentLine = '';
+            for (const word of words) {
+                if ((currentLine + word).length > maxLength) {
+                    lines.push(currentLine.trim());
+                    currentLine = '';
+                }
+                currentLine += word + ' ';
+            }
+            lines.push(currentLine.trim());
+            return lines;
+        }
+
+        const freqCtx = document.getElementById('freqChart').getContext('2d');
+        new Chart(freqCtx, {
+            type: 'bar',
+            data: {
+                labels: ['E', 'T', 'A', 'O', 'I', 'N', 'S', 'H', 'R', 'D', 'L', 'U'],
+                datasets: [{
+                    label: 'Relative Frequency in English (%)',
+                    data: [12.7, 9.1, 8.2, 7.5, 7.0, 6.7, 6.3, 6.1, 6.0, 4.3, 4.0, 2.8],
+                    backgroundColor: chartColors.primary,
+                    borderColor: chartColors.secondary,
+                    borderWidth: 1
+                }]
+            },
+            options: defaultChartOptions
+        });
+        
+        const hashCtx = document.getElementById('hashChart').getContext('2d');
+        new Chart(hashCtx, {
+            type: 'bar',
+            data: {
+                labels: ['SHA-1', 'SHA-224', 'SHA-256', 'SHA-384', 'SHA-512'],
+                datasets: [{
+                    label: 'Digest Size (bits)',
+                    data: [160, 224, 256, 384, 512],
+                    backgroundColor: chartColors.primary,
+                    borderColor: chartColors.secondary,
+                    borderWidth: 1
+                }]
+            },
+            options: defaultChartOptions
+        });
+
+        const keySizeCtx = document.getElementById('keySizeChart').getContext('2d');
+        const longLabel = 'Rivest-Shamir-Adleman (RSA)';
+        new Chart(keySizeCtx, {
+            type: 'bar',
+            data: {
+                labels: [wrapLabel(longLabel, 16), 'Elliptic Curve Cryptography (ECC)'],
+                datasets: [{
+                    label: 'Key Size (bits) for 128-bit Symmetric Security Level',
+                    data: [3072, 256],
+                    backgroundColor: [chartColors.primary, chartColors.secondary],
+                    borderWidth: 1
+                }]
+            },
+            options: defaultChartOptions
+        });
+
+    </script>
+</body>
+</html>
